@@ -4,7 +4,7 @@
   <arg name="is_register_lidar2camera_tf" default="true" />
   <arg name="is_publish_projection_matrix" default="true" />
   <arg name="is_publish_camera_info" default="true" />
-  <arg name="camera_calib" default="$(env HOME)/shared_dir/kitti_detect_launch/camera_lidar_kitti_05.yaml"/>
+  <arg name="camera_calib" default="$(find fusion_detect)/param/camera_lidar_kitti_05.yaml"/>
 
   <node name="republish" type="republish" pkg="image_transport" output="screen" args="compressed in:=/image_left raw out:=/image_raw" />
   <!-- calibration_publisher -->
