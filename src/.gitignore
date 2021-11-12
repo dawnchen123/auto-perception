@@ -31,5 +31,7 @@
 *.out
 *.app
 
+CMakeLists.txt
+
 build/*
 .vscode/*
