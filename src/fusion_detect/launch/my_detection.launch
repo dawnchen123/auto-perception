@@ -1,0 +1,42 @@
+<launch>
+
+  <!-- setting of this launch file -->
+  <arg name="is_register_lidar2camera_tf" default="true" />
+  <arg name="is_publish_projection_matrix" default="true" />
+  <arg name="is_publish_camera_info" default="true" />
+  <arg name="camera_calib" default="$(env HOME)/shared_dir/kitti_detect_launch/camera_lidar_kitti_05.yaml"/>
+
+  <node name="republish" type="republish" pkg="image_transport" output="screen" args="compressed in:=/image_left raw out:=/image_raw" />
+  <!-- calibration_publisher -->
+  <include file="$(find calibration_publisher)/launch/calibration_publisher.launch">
+    <arg name="file" value="$(arg camera_calib)" />
+    <arg name="register_lidar2camera_tf" value="$(arg is_register_lidar2camera_tf)" />
+    <arg name="publish_extrinsic_mat" value="$(arg is_publish_projection_matrix)" />
+    <arg name="publish_camera_info" value="$(arg is_publish_camera_info)" />
+  </include>
+
+  <!-- points2image -->
+  <node pkg="points2image" type="points2image" name="points2image" />
+
+  <!-- yolo detect -->
+  <include file="$(find vision_darknet_detect)/launch/vision_yolo3_detect.launch" />
+
+  <!-- range_fusion -->
+  <include file="$(find range_vision_fusion)/launch/range_vision_fusion.launch" />
+
+  <!-- euclidean_cluster -->
+  <include file="$(find lidar_euclidean_cluster_detect)/launch/lidar_euclidean_cluster_detect.launch">
+    <arg name="cluster_size_min" value="5" />
+  </include>
+
+  <!-- contrours tracking -->
+  <include file="$(find lidar_shape_estimation)/launch/shape_estimation_clustering.launch" />
+  <include file="$(find lidar_kf_contour_track)/launch/lidar_kf_contour_track.launch" /> 
+
+  <!-- 3D detectiong -->
+  <include file="$(find lidar_point_pillars)/launch/lidar_point_pillars.launch" /> 
+  
+    <!-- object fusion -->
+  <include file="$(find fusion_detect)/launch/fusion_detect.launch" /> 
+
+</launch>
