@@ -22,6 +22,7 @@
 //#include "autoware_msgs/CameraExtrinsic.h"
 
 #include <include/points_image/points_image.hpp>
+#include <opencv2/opencv.hpp>
 
 #define CAMERAEXTRINSICMAT "CameraExtrinsicMat"
 #define CAMERAMAT "CameraMat"
@@ -70,6 +71,23 @@ static void intrinsic_callback(const sensor_msgs::CameraInfo& msg)
   resetMatrix();
 }
 
+
+cv::Mat Array2Mat(std::vector<float> data, int row, int col)
+{
+    unsigned char (*array)[col] = (unsigned char(*)[col])malloc(sizeof(unsigned char) * row * col);
+    // unsigned char **array = new unsigned char[row][col];
+    for (int i = 0; i <row; ++i)
+    {
+        for (int j = 0; j < col; ++j)
+        {
+            array[i][j] =  (unsigned char )(data[i * col + j]*255) ;
+        }
+    }
+    std::vector<cv::Mat> channels;
+    cv::Mat img(row ,col,  CV_8UC1, (unsigned char*)array);
+    return img;
+}
+
 static void callback(const sensor_msgs::PointCloud2ConstPtr& msg)
 {
   if (cameraExtrinsicMat.empty() || cameraMat.empty() || distCoeff.empty() || imageSize.height == 0 ||
@@ -81,6 +99,9 @@ static void callback(const sensor_msgs::PointCloud2ConstPtr& msg)
   }
 
   autoware_msgs::PointsImage pub_msg = pointcloud2_to_image(msg, cameraExtrinsicMat, cameraMat, distCoeff, imageSize);
+  // cv::Mat dest = Array2Mat(pub_msg.intensity,pub_msg.image_height,pub_msg.image_width);
+  // cv::imwrite("dest.png",dest);
+  // ROS_INFO("Convert a image!");
   pub.publish(pub_msg);
 }
 

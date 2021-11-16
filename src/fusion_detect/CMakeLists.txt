@@ -1,6 +1,9 @@
 cmake_minimum_required(VERSION 2.8.3)
 project(fusion_detect)
 
+
+find_package(OpenCV 3 REQUIRED)
+
 find_package(catkin REQUIRED COMPONENTS
   autoware_msgs
   roscpp
@@ -8,6 +11,7 @@ find_package(catkin REQUIRED COMPONENTS
   std_msgs
   sensor_msgs
   message_filters
+  cv_bridge
 )
 
 ## Generate messages in the 'msg' folder
@@ -33,6 +37,7 @@ catkin_package(
 
 include_directories(
   include
+  ${OpenCV_INCLUDE_DIRS}
   ${catkin_INCLUDE_DIRS}
 )
 
@@ -40,7 +45,7 @@ include_directories(
 add_executable(fusion_detect 
   src/fusion_detect.cpp
 )
-target_link_libraries(fusion_detect ${catkin_LIBRARIES})
+target_link_libraries(fusion_detect ${catkin_LIBRARIES} ${OpenCV_LIBRARIES})
 
 
 
