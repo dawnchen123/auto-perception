@@ -15,6 +15,9 @@
 #include <message_filters/subscriber.h>  
 #include <message_filters/time_synchronizer.h> 
 
+#include <visualization_msgs/Marker.h>
+#include <visualization_msgs/MarkerArray.h>
+
 #include "autoware_msgs/DetectedObjectArray.h"
 #include "autoware_msgs/DetectedObject.h"
 
@@ -41,10 +44,11 @@ autoware_msgs::DetectedObjectArray finalResultArray;
 
 ros::Publisher pub_final_results;
 ros::Publisher image_pub_;
+ros::Publisher marker_pub_box_;
 
 bool isSameObject(autoware_msgs::DetectedObject fusion_result, autoware_msgs::DetectedObject pointpillars_result);
 void getImageBox(autoware_msgs::DetectedObjectArray pointpillars_result, cv::Mat yolo_img);
-
+void ClearAllMarker();
 
 void callback(const autoware_msgs::DetectedObjectArray::ConstPtr &in_pointpillar_detections, const autoware_msgs::DetectedObjectArray::ConstPtr &in_fusion_detections,const sensor_msgs::Image::ConstPtr & img_msg)  //回调中包含多个消息  
 {  
@@ -98,7 +102,7 @@ void callback(const autoware_msgs::DetectedObjectArray::ConstPtr &in_pointpillar
     cv_bridge::CvImagePtr cv_ptr;
     cv_ptr = cv_bridge::toCvCopy(img_msg,"bgr8");
     cv_ptr->image.copyTo(origin_img);
-    getImageBox(finalResultArray,origin_img);
+    getImageBox(pointpillarsResultArray,origin_img);
 
     pub_final_results.publish(finalResultArray);
   // Solve all of perception here...  
@@ -180,6 +184,21 @@ void load_Calibration(std::string file_name)
 
 void getImageBox(autoware_msgs::DetectedObjectArray pointpillars_result, cv::Mat yolo_img){ 
     cv::Mat image_send = yolo_img.clone();
+    ClearAllMarker();
+    visualization_msgs::MarkerArray marker_array_box;
+    visualization_msgs::Marker line_strip;
+    line_strip.header.frame_id = "velodyne";
+    line_strip.header.stamp = ros::Time::now();
+    line_strip.ns = "apollo::perception";
+    line_strip.type = visualization_msgs::Marker::LINE_STRIP;
+    line_strip.scale.x = 0.2;
+    line_strip.color.r = 0.0;
+    line_strip.color.g = 1.0;
+    line_strip.color.b = 1.0;
+    line_strip.color.a = 1.0;
+    line_strip.points.resize(5);
+
+    int marker_id = 0;
     for(int obj = 0; obj < pointpillars_result.objects.size(); ++obj) {
         Eigen::Vector3d center(pointpillars_result.objects[obj].pose.position.x,
                                                         pointpillars_result.objects[obj].pose.position.y,
@@ -195,7 +214,7 @@ void getImageBox(autoware_msgs::DetectedObjectArray pointpillars_result, cv::Mat
         // std::cout<<"Pose: "<<pointpillars_result.objects[obj].pose.position<<std::endl;
         tf::Matrix3x3(RQ2).getRPY(roll,pitch,yaw);  
 
-        Eigen::Vector3d ldir(cos(-yaw), sin(-yaw), 0);
+        Eigen::Vector3d ldir(cos(yaw), sin(yaw), 0);
         Eigen::Vector3d odir(-ldir[1], ldir[0], 0);
 
         Eigen::Vector3d bottom_quad[8];
@@ -203,6 +222,60 @@ void getImageBox(autoware_msgs::DetectedObjectArray pointpillars_result, cv::Mat
         bottom_quad[1] = center + ldir * -half_l + odir * half_w;   // B(-half_l, half_w)
         bottom_quad[2] = center + ldir * half_l + odir * half_w;    // C(half_l, half_w)
         bottom_quad[3] = center + ldir * half_l + odir * -half_w;   // D(half_l, -half_w)
+
+
+    /*Draw box start*/
+    geometry_msgs::Point p1,p2,p3,p4,p5,p6,p7,p8;
+
+    p1.x = p5.x = bottom_quad[0][0];
+    p1.y = p5.y = bottom_quad[0][1];
+    p1.z = bottom_quad[0][2]-h/2;
+    p5.z =bottom_quad[0][2]+h/2;
+    p2.x = p6.x = bottom_quad[1][0];
+    p2.y = p6.y = bottom_quad[1][1];
+    p2.z = bottom_quad[1][2]-h/2;
+    p6.z = bottom_quad[1][2]+h/2;
+    p3.x = p7.x = bottom_quad[2][0];
+    p3.y = p7.y = bottom_quad[2][1];
+    p3.z = bottom_quad[2][2]-h/2;
+    p7.z = bottom_quad[2][2]+h/2;
+    p4.x = p8.x = bottom_quad[3][0];
+    p4.y = p8.y = bottom_quad[3][1];
+    p4.z = bottom_quad[3][2]-h/2;
+    p8.z = bottom_quad[3][2]+h/2;
+    line_strip.id = marker_id;
+    line_strip.points[0] = p1;
+    line_strip.points[1] = p2;
+    line_strip.points[2] = p3;
+    line_strip.points[3] = p4;
+    line_strip.points[4] = p1;
+    marker_array_box.markers.push_back(line_strip);
+    marker_id++;
+    line_strip.id = marker_id;
+    line_strip.points[0] = p5;
+    line_strip.points[1] = p6;
+    line_strip.points[2] = p7;
+    line_strip.points[3] = p8;
+    line_strip.points[4] = p5;
+    marker_array_box.markers.push_back(line_strip);
+    marker_id++;
+    line_strip.id = marker_id;
+    line_strip.points[0] = p1;
+    line_strip.points[1] = p5;
+    line_strip.points[2] = p8;
+    line_strip.points[3] = p4;
+    line_strip.points[4] = p1;
+    marker_array_box.markers.push_back(line_strip);
+    marker_id++;
+    line_strip.id = marker_id;
+    line_strip.points[0] = p2;
+    line_strip.points[1] = p6;
+    line_strip.points[2] = p7;
+    line_strip.points[3] = p3;
+    line_strip.points[4] = p2;
+    marker_array_box.markers.push_back(line_strip);
+    /*Draw box end*/
+
         // top 4 vertices
         bottom_quad[4] = bottom_quad[0];
         bottom_quad[4](2) += h;
@@ -295,8 +368,16 @@ void getImageBox(autoware_msgs::DetectedObjectArray pointpillars_result, cv::Mat
     sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(),"bgr8",image_send).toImageMsg();
     sensor_msgs::Image img_pub = *img_msg;
     image_pub_.publish(img_pub);
+    marker_pub_box_.publish(marker_array_box);
 }
 
+void ClearAllMarker() {
+  visualization_msgs::MarkerArray::Ptr clear_marker_array(new visualization_msgs::MarkerArray);
+  visualization_msgs::Marker dummy_marker;
+  dummy_marker.action = visualization_msgs::Marker::DELETEALL;
+  clear_marker_array->markers.push_back(dummy_marker);  
+  marker_pub_box_.publish(clear_marker_array);
+}
 
 int main(int argc, char** argv)
 {
@@ -307,7 +388,7 @@ int main(int argc, char** argv)
 
     pub_final_results = n.advertise<autoware_msgs::DetectedObjectArray>("/detection/final_result/objects", 30);
     image_pub_ = n.advertise<sensor_msgs::Image>("/fusion_image", 30);
-
+    marker_pub_box_ = n.advertise<visualization_msgs::MarkerArray>("/lidar_perception/marker_box",1);
     // ros::Subscriber image_sub_ = n.subscribe<sensor_msgs::Image>("/image_raw",1,image_process);
 
     message_filters::Subscriber<autoware_msgs::DetectedObjectArray> sub_fusion(n, "/detection/fusion_tools/objects", 1);             // topic1 输入  

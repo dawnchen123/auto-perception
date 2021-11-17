@@ -181,7 +181,7 @@ void PointPillarsROS::pointsCallback(const sensor_msgs::PointCloud2::ConstPtr& m
   point_pillars_ptr_->doInference(points_array, pcl_pc_ptr->size(), out_detection);
 
   clock_t time_end = clock();
-  std::cout << "all time = " << (double)(time_end-time_begin)/CLOCKS_PER_SEC << std::endl;
+  std::cout << "all detect time = " << (double)(time_end-time_begin)/CLOCKS_PER_SEC << std::endl;
   
   delete[] points_array;
   pubDetectedObject(out_detection, msg->header);

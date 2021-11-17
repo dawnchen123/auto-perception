@@ -852,7 +852,7 @@ void removePointsUpTo(const pcl::PointCloud<pcl::PointXYZ>::Ptr in_cloud_ptr,
 void velodyne_callback(const sensor_msgs::PointCloud2ConstPtr& in_sensor_cloud)
 {
   //_start = std::chrono::system_clock::now();
-
+  clock_t time_begin = clock();
   if (!_using_sensor_cloud)
   {
     _using_sensor_cloud = true;
@@ -927,6 +927,10 @@ void velodyne_callback(const sensor_msgs::PointCloud2ConstPtr& in_sensor_cloud)
 
     _using_sensor_cloud = false;
   }
+
+  clock_t time_end = clock();
+  std::cout << "all cluster time = " << (double)(time_end-time_begin)/CLOCKS_PER_SEC << std::endl;
+  
 }
 int main(int argc, char **argv)
 {
@@ -1016,7 +1020,7 @@ int main(int argc, char **argv)
   private_nh.param("clustering_distance", _clustering_distance, 0.75);
   ROS_INFO("[%s] clustering_distance: %f", __APP_NAME__, _clustering_distance);
 
-  private_nh.param("use_gpu", _use_gpu, false);
+  private_nh.param("use_gpu", _use_gpu, true);
   ROS_INFO("[%s] use_gpu: %d", __APP_NAME__, _use_gpu);
 
   private_nh.param("use_multiple_thres", _use_multiple_thres, false);

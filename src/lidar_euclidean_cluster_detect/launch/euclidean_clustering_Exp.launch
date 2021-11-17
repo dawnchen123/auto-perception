@@ -8,7 +8,7 @@
   <arg name="cluster_size_max" default="10000" /><!-- Maximum number of points to allow inside a cluster-->
   <arg name="sync" default="false" />
   <arg name="use_diffnormals" default="false" />
-  <arg name="pose_estimation" default="true" />
+  <arg name="pose_estimation" default="false" />
   <arg name="clip_min_height" default="-0.3" />
   <arg name="clip_max_height" default="0.5" />
 

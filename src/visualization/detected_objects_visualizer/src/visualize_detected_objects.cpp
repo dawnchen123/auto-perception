@@ -24,7 +24,6 @@ VisualizeDetectedObjects::VisualizeDetectedObjects() : arrow_height_(0.5), label
   ros::NodeHandle private_nh_("~");
 
   ros_namespace_ = ros::this_node::getNamespace();
-
   if (ros_namespace_.substr(0, 2) == "//")
   {
     ros_namespace_.erase(ros_namespace_.begin());
@@ -48,7 +47,7 @@ VisualizeDetectedObjects::VisualizeDetectedObjects() : arrow_height_(0.5), label
   ROS_INFO("[%s] marker_display_duration: %.2f", __APP_NAME__, marker_display_duration_);
 
   std::vector<double> color;
-  private_nh_.param<std::vector<double>>("label_color", color, {0.,0.,0.,1.0});
+  private_nh_.param<std::vector<double>>("label_color", color, {0.,255.,0.,1.0});
   label_color_ = ParseColor(color);
   ROS_INFO("[%s] label_color: %s", __APP_NAME__, ColorToString(label_color_).c_str());
 
@@ -60,11 +59,11 @@ VisualizeDetectedObjects::VisualizeDetectedObjects() : arrow_height_(0.5), label
   hull_color_ = ParseColor(color);
   ROS_INFO("[%s] hull_color: %s", __APP_NAME__, ColorToString(hull_color_).c_str());
 
-  private_nh_.param<std::vector<double>>("box_color", color, {51.,128.,204.,1.0});
+  private_nh_.param<std::vector<double>>("box_color", color, {0.,0.,255.,1.0});
   box_color_ = ParseColor(color);
   ROS_INFO("[%s] box_color: %s", __APP_NAME__, ColorToString(box_color_).c_str());
 
-  private_nh_.param<std::vector<double>>("model_color", color, {0.,190.,190.,0.5});
+  private_nh_.param<std::vector<double>>("model_color", color, {0.,255.,0.,0.5});
   model_color_ = ParseColor(color);
   ROS_INFO("[%s] model_color: %s", __APP_NAME__, ColorToString(model_color_).c_str());
 
@@ -162,7 +161,6 @@ void VisualizeDetectedObjects::DetectedObjectsCallback(const autoware_msgs::Dete
                                        centroid_markers.markers.begin(), centroid_markers.markers.end());
 
   publisher_markers_.publish(visualization_markers);
-
 }
 
 visualization_msgs::MarkerArray
@@ -481,9 +479,9 @@ VisualizeDetectedObjects::ObjectsToLabels(const autoware_msgs::DetectedObjectArr
       }
 
       label_marker.pose.position.x = object.pose.position.x;
-      label_marker.pose.position.y = object.pose.position.y;
-      label_marker.pose.position.z = label_height_;
-      label_marker.scale.z = 1.0;
+      label_marker.pose.position.y = object.pose.position.y+1.5;
+      label_marker.pose.position.z = label_height_+0.1;
+      label_marker.scale.z = 0.8;
       if (!label_marker.text.empty())
         label_markers.markers.push_back(label_marker);
     }

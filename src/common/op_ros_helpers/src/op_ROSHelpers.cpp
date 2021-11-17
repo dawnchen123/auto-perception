@@ -193,7 +193,7 @@ int ROSHelpers::ConvertTrackedObjectsMarkers(const PlannerHNS::WayPoint& currSta
     {
       visualization_msgs::Marker dir_mkr = CreateGenMarker(trackedObstacles.at(i).center.pos.x,trackedObstacles.at(i).center.pos.y,trackedObstacles.at(i).center.pos.z+0.5,
           trackedObstacles.at(i).center.pos.a,0,1,0,0.3,centers.markers.size()+i,"Directions", visualization_msgs::Marker::ARROW);
-      dir_mkr.scale.x = 0.4;
+      dir_mkr.scale.x = 0.5;
       if(i < dirs.markers.size())
       {
         dir_mkr.id = dirs.markers.at(i).id;
@@ -210,12 +210,12 @@ int ROSHelpers::ConvertTrackedObjectsMarkers(const PlannerHNS::WayPoint& currSta
 //      text_mkr = CreateGenMarker(trackedObstacles.at(i).center.pos.x+0.5,trackedObstacles.at(i).center.pos.y+0.5,trackedObstacles.at(i).center.pos.z+1,
 //          trackedObstacles.at(i).center.pos.a,1,0,0,0.75,centers.markers.size()*2+i,"InfoText", visualization_msgs::Marker::TEXT_VIEW_FACING);
 //    else
-    text_mkr = CreateGenMarker(trackedObstacles.at(i).center.pos.x+0.5,trackedObstacles.at(i).center.pos.y+0.5,trackedObstacles.at(i).center.pos.z+1,
-              trackedObstacles.at(i).center.pos.a,1,1,1,1.2,centers.markers.size()*2+i,"InfoText", visualization_msgs::Marker::TEXT_VIEW_FACING);
+    text_mkr = CreateGenMarker(trackedObstacles.at(i).center.pos.x-0.5,trackedObstacles.at(i).center.pos.y+1.5,trackedObstacles.at(i).center.pos.z+1,
+              trackedObstacles.at(i).center.pos.a,0.4,0.9,0.1,0.8,centers.markers.size()*2+i,"InfoText", visualization_msgs::Marker::TEXT_VIEW_FACING);
 
     std::ostringstream str_out;
     //str_out << trackedObstacles.at(i).id << " ( " << speed << " )" << " (" << trackedObstacles.at(i).distance_to_center << ")";
-    str_out << trackedObstacles.at(i).id << " (" << speed << ")";
+    str_out << trackedObstacles.at(i).id <<std::endl<<"(" << speed << ")";
     text_mkr.text = str_out.str();
 
     if(i < text_info.markers.size())
@@ -258,7 +258,7 @@ int ROSHelpers::ConvertTrackedObjectsMarkers(const PlannerHNS::WayPoint& currSta
 
 
     //Trajectories
-    visualization_msgs::Marker traj_mkr = CreateGenMarker(0,0,0,0,1,1,0,0.1,centers.markers.size()*4+i,"tracked_trajectories", visualization_msgs::Marker::LINE_STRIP);
+    visualization_msgs::Marker traj_mkr = CreateGenMarker(0,0,0,0,1,1,0,0.05,centers.markers.size()*4+i,"tracked_trajectories", visualization_msgs::Marker::LINE_STRIP);
 
     for(unsigned int p = 0; p < trackedObstacles.at(i).centers_list.size(); p++)
     {
