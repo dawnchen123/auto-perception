@@ -20,9 +20,9 @@ clip_max_height: 0.5
 # Enable side-filtering
 keep_lanes: true
 # Remove points further than this distance to the left (m)
-keep_lane_left_distance: 15
+keep_lane_left_distance: 10
 # Remove points further than this distance to the right (m)
-keep_lane_right_distance: 15
+keep_lane_right_distance: 10
 
 # Enable ground plane filtering (removes points belonging to the ground)
 remove_ground: true

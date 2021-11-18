@@ -26,8 +26,8 @@
 #include <opencv2/highgui.hpp>
 #include <opencv2/imgproc.hpp>
 
-#define CAR_THRESHOLD 1
-#define PERSON_THRESHOLD 0.1
+#define CAR_THRESHOLD 2
+#define PERSON_THRESHOLD 0.5
 
 using namespace message_filters;  
 
@@ -41,14 +41,28 @@ struct LidarPoint { // single lidar point in space
 autoware_msgs::DetectedObjectArray pointpillarsResultArray;
 autoware_msgs::DetectedObjectArray fusionResultArray;
 autoware_msgs::DetectedObjectArray finalResultArray;
+autoware_msgs::DetectedObjectArray trackedArray;
 
 ros::Publisher pub_final_results;
 ros::Publisher image_pub_;
 ros::Publisher marker_pub_box_;
 
-bool isSameObject(autoware_msgs::DetectedObject fusion_result, autoware_msgs::DetectedObject pointpillars_result);
+bool isSameObject(autoware_msgs::DetectedObject tracked_result, autoware_msgs::DetectedObject pointpillars_result);
 void getImageBox(autoware_msgs::DetectedObjectArray pointpillars_result, cv::Mat yolo_img);
 void ClearAllMarker();
+
+void trackCallback(const autoware_msgs::DetectedObjectArray::ConstPtr &in_track_detections){
+    trackedArray.header = in_track_detections->header;
+    trackedArray.objects.clear();
+    for (size_t i = 0; i < in_track_detections->objects.size(); i++)
+    {        
+        if((in_track_detections->objects[i].velocity.linear.x>0 || in_track_detections->objects[i].velocity.linear.y>0 )&&in_track_detections->objects[i].dimensions.y<3 ){
+            trackedArray.objects.push_back(in_track_detections->objects[i]);
+            // std::cout<<"Orientation: "<<trackedArray.objects[i].velocity.linear.x<<std::endl;
+        }
+    }
+    std::cout<<"Tracked object size: "<<trackedArray.objects.size()<<std::endl;
+}
 
 void callback(const autoware_msgs::DetectedObjectArray::ConstPtr &in_pointpillar_detections, const autoware_msgs::DetectedObjectArray::ConstPtr &in_fusion_detections,const sensor_msgs::Image::ConstPtr & img_msg)  //回调中包含多个消息  
 {  
@@ -60,8 +74,6 @@ void callback(const autoware_msgs::DetectedObjectArray::ConstPtr &in_pointpillar
 
     for (size_t i = 0; i < in_pointpillar_detections->objects.size(); i++)
     {        
-        // std::cout<<"Orientation: "<<pointpillarsResultArray.objects[i].pose.orientation<<std::endl;
-        // std::cout<<"Pointpillar get a object: "<< in_range_detections->objects[i].label<<std::endl;
         pointpillarsResultArray.objects.push_back(in_pointpillar_detections->objects[i]);
     }
 
@@ -70,10 +82,10 @@ void callback(const autoware_msgs::DetectedObjectArray::ConstPtr &in_pointpillar
 
     for (size_t i = 0; i < in_fusion_detections->objects.size(); i++)
     {
-        bool sameFlag = false;
+        // bool sameFlag = false;
         //remove same object
         // if( in_fusion_detections->objects[i].label == "car" || in_fusion_detections->objects[i].label == "person" || in_fusion_detections->objects[i].label == "truck" || in_fusion_detections->objects[i].label == "bicycle"){
-        if( in_fusion_detections->objects[i].label == "person" || in_fusion_detections->objects[i].label == "bicycle" || in_fusion_detections->objects[i].label =="motorbike"){
+        if( in_fusion_detections->objects[i].label == "person" || in_fusion_detections->objects[i].label == "bicycle" || in_fusion_detections->objects[i].label =="motorbike"  ){
             // for(size_t j=0;j<pointpillarsResultArray.objects.size();j++){
             //     if(isSameObject(in_fusion_detections->objects[i],pointpillarsResultArray.objects[j])==true){
             //         sameFlag = true;
@@ -88,10 +100,21 @@ void callback(const autoware_msgs::DetectedObjectArray::ConstPtr &in_pointpillar
 
 
     for(size_t i=0;i<pointpillarsResultArray.objects.size();i++){
+        bool sameFlag = false;
+        for(size_t j=0;j<trackedArray.objects.size();j++){
+            if(isSameObject(trackedArray.objects[j],pointpillarsResultArray.objects[i])==true){
+                sameFlag = true;
+                pointpillarsResultArray.objects[i].velocity.linear = trackedArray.objects[j].velocity.linear;
+                std::cout<<"Get a object velocity: "<<pointpillarsResultArray.objects[i].velocity.linear<<std::endl;
+            }    
+        }
+        
         finalResultArray.objects.push_back(pointpillarsResultArray.objects[i]);
         // std::cout<<"Label: "<<pointpillarsResultArray.objects[i].label<<", "<<pointpillarsResultArray.objects[i].dimensions.x<<std::endl;
         // std::cout<<"Pose: "<<pointpillarsResultArray.objects[i].pose.position<<std::endl;
         // std::cout<<"Orientation: "<<pointpillarsResultArray.objects[i].pose.orientation<<std::endl;
+        // std::cout<<"Orientation: "<<pointpillarsResultArray.objects[i].velocity.linear.x<<std::endl;
+
     }
     if(pointpillarsResultArray.objects.size()>0){
         ROS_INFO("origin num: %d, final num: %d",pointpillarsResultArray.objects.size(), finalResultArray.objects.size());
@@ -102,7 +125,7 @@ void callback(const autoware_msgs::DetectedObjectArray::ConstPtr &in_pointpillar
     cv_bridge::CvImagePtr cv_ptr;
     cv_ptr = cv_bridge::toCvCopy(img_msg,"bgr8");
     cv_ptr->image.copyTo(origin_img);
-    getImageBox(pointpillarsResultArray,origin_img);
+    getImageBox(finalResultArray,origin_img);
 
     pub_final_results.publish(finalResultArray);
   // Solve all of perception here...  
@@ -110,13 +133,12 @@ void callback(const autoware_msgs::DetectedObjectArray::ConstPtr &in_pointpillar
 
 
 
-bool isSameObject(autoware_msgs::DetectedObject fusion_result, autoware_msgs::DetectedObject pointpillars_result) {
-    float dx,dy,dz,result_distance;
-    dx = fusion_result.pose.position.x-pointpillars_result.pose.position.x;
-    dy = fusion_result.pose.position.y-pointpillars_result.pose.position.y;
-    dz = fusion_result.pose.position.z-pointpillars_result.pose.position.z;
+bool isSameObject(autoware_msgs::DetectedObject tracked_result, autoware_msgs::DetectedObject pointpillars_result) {
+    float dx,dy,result_distance;
+    dx = tracked_result.pose.position.x-pointpillars_result.pose.position.x;
+    dy = tracked_result.pose.position.y-pointpillars_result.pose.position.y;
     result_distance = sqrt(dx*dx+dy*dy);
-    if(fusion_result.label=="person" && fabs(result_distance)<PERSON_THRESHOLD){
+    if(tracked_result.label=="person" && fabs(result_distance)<PERSON_THRESHOLD){
         return true;
     }else if(fabs(result_distance)<CAR_THRESHOLD){
         // ROS_INFO("Same Object: %.2f",result_distance);
@@ -200,6 +222,11 @@ void getImageBox(autoware_msgs::DetectedObjectArray pointpillars_result, cv::Mat
 
     int marker_id = 0;
     for(int obj = 0; obj < pointpillars_result.objects.size(); ++obj) {
+        //modify person position error
+        if( pointpillars_result.objects[obj].label == "person"){
+            pointpillars_result.objects[obj].pose.position.z -=1.5;
+        }
+
         Eigen::Vector3d center(pointpillars_result.objects[obj].pose.position.x,
                                                         pointpillars_result.objects[obj].pose.position.y,
                                                         pointpillars_result.objects[obj].pose.position.z);
@@ -224,57 +251,57 @@ void getImageBox(autoware_msgs::DetectedObjectArray pointpillars_result, cv::Mat
         bottom_quad[3] = center + ldir * half_l + odir * -half_w;   // D(half_l, -half_w)
 
 
-    /*Draw box start*/
-    geometry_msgs::Point p1,p2,p3,p4,p5,p6,p7,p8;
+        /*Draw 3Dbox in Pointcloud start*/
+        geometry_msgs::Point p1,p2,p3,p4,p5,p6,p7,p8;
 
-    p1.x = p5.x = bottom_quad[0][0];
-    p1.y = p5.y = bottom_quad[0][1];
-    p1.z = bottom_quad[0][2]-h/2;
-    p5.z =bottom_quad[0][2]+h/2;
-    p2.x = p6.x = bottom_quad[1][0];
-    p2.y = p6.y = bottom_quad[1][1];
-    p2.z = bottom_quad[1][2]-h/2;
-    p6.z = bottom_quad[1][2]+h/2;
-    p3.x = p7.x = bottom_quad[2][0];
-    p3.y = p7.y = bottom_quad[2][1];
-    p3.z = bottom_quad[2][2]-h/2;
-    p7.z = bottom_quad[2][2]+h/2;
-    p4.x = p8.x = bottom_quad[3][0];
-    p4.y = p8.y = bottom_quad[3][1];
-    p4.z = bottom_quad[3][2]-h/2;
-    p8.z = bottom_quad[3][2]+h/2;
-    line_strip.id = marker_id;
-    line_strip.points[0] = p1;
-    line_strip.points[1] = p2;
-    line_strip.points[2] = p3;
-    line_strip.points[3] = p4;
-    line_strip.points[4] = p1;
-    marker_array_box.markers.push_back(line_strip);
-    marker_id++;
-    line_strip.id = marker_id;
-    line_strip.points[0] = p5;
-    line_strip.points[1] = p6;
-    line_strip.points[2] = p7;
-    line_strip.points[3] = p8;
-    line_strip.points[4] = p5;
-    marker_array_box.markers.push_back(line_strip);
-    marker_id++;
-    line_strip.id = marker_id;
-    line_strip.points[0] = p1;
-    line_strip.points[1] = p5;
-    line_strip.points[2] = p8;
-    line_strip.points[3] = p4;
-    line_strip.points[4] = p1;
-    marker_array_box.markers.push_back(line_strip);
-    marker_id++;
-    line_strip.id = marker_id;
-    line_strip.points[0] = p2;
-    line_strip.points[1] = p6;
-    line_strip.points[2] = p7;
-    line_strip.points[3] = p3;
-    line_strip.points[4] = p2;
-    marker_array_box.markers.push_back(line_strip);
-    /*Draw box end*/
+        p1.x = p5.x = bottom_quad[0][0];
+        p1.y = p5.y = bottom_quad[0][1];
+        p1.z = bottom_quad[0][2]-h/2;
+        p5.z =bottom_quad[0][2]+h/2;
+        p2.x = p6.x = bottom_quad[1][0];
+        p2.y = p6.y = bottom_quad[1][1];
+        p2.z = bottom_quad[1][2]-h/2;
+        p6.z = bottom_quad[1][2]+h/2;
+        p3.x = p7.x = bottom_quad[2][0];
+        p3.y = p7.y = bottom_quad[2][1];
+        p3.z = bottom_quad[2][2]-h/2;
+        p7.z = bottom_quad[2][2]+h/2;
+        p4.x = p8.x = bottom_quad[3][0];
+        p4.y = p8.y = bottom_quad[3][1];
+        p4.z = bottom_quad[3][2]-h/2;
+        p8.z = bottom_quad[3][2]+h/2;
+        line_strip.id = marker_id;
+        line_strip.points[0] = p1;
+        line_strip.points[1] = p2;
+        line_strip.points[2] = p3;
+        line_strip.points[3] = p4;
+        line_strip.points[4] = p1;
+        marker_array_box.markers.push_back(line_strip);
+        marker_id++;
+        line_strip.id = marker_id;
+        line_strip.points[0] = p5;
+        line_strip.points[1] = p6;
+        line_strip.points[2] = p7;
+        line_strip.points[3] = p8;
+        line_strip.points[4] = p5;
+        marker_array_box.markers.push_back(line_strip);
+        marker_id++;
+        line_strip.id = marker_id;
+        line_strip.points[0] = p1;
+        line_strip.points[1] = p5;
+        line_strip.points[2] = p8;
+        line_strip.points[3] = p4;
+        line_strip.points[4] = p1;
+        marker_array_box.markers.push_back(line_strip);
+        marker_id++;
+        line_strip.id = marker_id;
+        line_strip.points[0] = p2;
+        line_strip.points[1] = p6;
+        line_strip.points[2] = p7;
+        line_strip.points[3] = p3;
+        line_strip.points[4] = p2;
+        marker_array_box.markers.push_back(line_strip);
+        /*Draw box end*/
 
         // top 4 vertices
         bottom_quad[4] = bottom_quad[0];
@@ -348,6 +375,8 @@ void getImageBox(autoware_msgs::DetectedObjectArray pointpillars_result, cv::Mat
         // cv::Scalar clr_b = cv::Scalar(255, 0, 0);
         // cv::Scalar clr_ta = cv::Scalar(0, 255, 255);
 
+
+
         if (!(min_u <= 0 || min_v <= 0 || max_u >= yolo_img.cols || max_v >= yolo_img.rows)) {
             cv::line(image_send, image_points[0], image_points[1], clr_b, 2, 8);
             cv::line(image_send, image_points[0], image_points[3], clr, 2, 8);
@@ -363,6 +392,24 @@ void getImageBox(autoware_msgs::DetectedObjectArray pointpillars_result, cv::Mat
             cv::line(image_send, image_points[5], image_points[6], clr, 2, 8);
 
             // cv::rectangle(image_send, cv::Point(min_u, min_v), cv::Point(max_u, max_v), clr_b, 2);
+            float velocity = sqrt(pointpillars_result.objects[obj].velocity.linear.x*pointpillars_result.objects[obj].velocity.linear.x+
+                                                    pointpillars_result.objects[obj].velocity.linear.y*pointpillars_result.objects[obj].velocity.linear.y)*3.6;
+            float distance = sqrt(pointpillars_result.objects[obj].pose.position.x*pointpillars_result.objects[obj].pose.position.x+
+                                                    pointpillars_result.objects[obj].pose.position.y*pointpillars_result.objects[obj].pose.position.y);
+            std::string text;
+            if(velocity>0){
+                text= pointpillars_result.objects[obj].label+": " + std::to_string(int(distance))+", "+std::to_string(int(velocity));
+            } else{
+                text = pointpillars_result.objects[obj].label+": " + std::to_string(int(distance));
+            }
+            int fontFace = cv::FONT_HERSHEY_COMPLEX;
+            double fontScale = 0.8;       //字体缩放比
+            int thickness = 0.8;
+            int baseline = 0;
+            cv::Size textSize = cv::getTextSize(text, fontFace, fontScale, thickness, &baseline);
+            baseline += thickness;
+            cv::Point textOrg(min_u, min_v-10);
+            cv::putText(image_send,text,textOrg,fontFace,fontScale,cv::Scalar(0, 255, 0),thickness,8);
         }
     }
     sensor_msgs::ImagePtr img_msg = cv_bridge::CvImage(std_msgs::Header(),"bgr8",image_send).toImageMsg();
@@ -398,7 +445,8 @@ int main(int argc, char** argv)
     sync.registerCallback(boost::bind(&callback, _1, _2, _3));    
 
     // ros::Subscriber sub_fusion = n.subscribe("/detection/fusion_tools/objects", 1000, fusionCallback);
-    // ros::Subscriber sub_pointpillar = n.subscribe("/detection/lidar_detector_3d/objects", 1000, pointpillarCallback);
+    ros::Subscriber sub_track = n.subscribe("/tracked_objects", 1000, trackCallback);
+
 
     ros::Rate r(30);  //    ros::Rate r(10.0 / publish_delay);
     while (ros::ok())

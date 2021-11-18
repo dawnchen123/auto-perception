@@ -1,7 +1,7 @@
 <launch>
   <arg name="vehicle_width" default="1.85" />
   <arg name="vehicle_length" default="4.2" />  
-  <arg name="min_object_size" default="4" />
+  <arg name="min_object_size" default="4" /> <!--  contour 斜边长度 -->
   <arg name="max_object_size" default="10.0" />
   <arg name="polygon_quarters" default="16" />
   <arg name="polygon_resolution" default="0.5" />
@@ -9,8 +9,8 @@
   <arg name="max_association_distance" default="4.5" />
   <arg name="max_association_size_diff" default="2.0" />
   
-  <arg name="max_remeber_time" default="2" />
-  <arg name="trust_counter" default="10" />
+  <arg name="max_remeber_time" default="4" />
+  <arg name="trust_counter" default="4" />
     
   <arg name="enableSimulationMode" default="true" />
   <arg name="enableStepByStepMode" default="false" />
